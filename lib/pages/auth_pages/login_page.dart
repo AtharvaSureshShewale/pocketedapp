@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:pocketed/auth/auth_service.dart';
-import 'package:pocketed/pages/registerpage.dart';
-import 'package:pocketed/pages/forgot_password.dart';
-
+import 'package:pocketed/pages/auth_pages/registerpage.dart';
+import 'package:pocketed/auth/auth_gate.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -12,30 +11,28 @@ class LoginPage extends StatefulWidget {
 }
 
 class _LoginPageState extends State<LoginPage> {
-  //get auth service
   final authService = AuthService();
 
-  //text controllers
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
 
-  //login button pressed
   void login() async {
-    //prepare data
     final email = _emailController.text;
     final password = _passwordController.text;
 
-    //attempt to login
     try {
       await authService.signInWithEmailPassword(email, password);
-    }
-    //catch any errors
-    catch (e) {
-      //show error message
-      ScaffoldMessenger.of(
-        // ignore: use_build_context_synchronously
-        context,
-      ).showSnackBar(SnackBar(content: Text('Login failed: $e')));
+
+      if (context.mounted) {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const AuthGate()),
+          (route) => false,
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Login failed: $e')),
+      );
     }
   }
 
@@ -48,7 +45,6 @@ class _LoginPageState extends State<LoginPage> {
       body: ListView(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 50),
         children: [
-          //email
           TextField(
             controller: _emailController,
             decoration: const InputDecoration(
@@ -56,8 +52,6 @@ class _LoginPageState extends State<LoginPage> {
               hintText: 'Enter your email',
             ),
           ),
-
-          //password
           TextField(
             controller: _passwordController,
             decoration: const InputDecoration(
@@ -66,12 +60,8 @@ class _LoginPageState extends State<LoginPage> {
             ),
             obscureText: true,
           ),
-
           const SizedBox(height: 20),
-          //button
           ElevatedButton(onPressed: login, child: const Text('Login')),
-
-          //go to signup page
           GestureDetector(
             onTap: () {
               Navigator.push(
@@ -79,25 +69,24 @@ class _LoginPageState extends State<LoginPage> {
                 MaterialPageRoute(builder: (context) => const RegisterPage()),
               );
             },
-
             child: Center(
               child: Text(
                 "Don't have an account? SignUp",
                 style: TextStyle(color: Theme.of(context).colorScheme.primary),
-                textAlign: TextAlign.center,
               ),
             ),
           ),
           TextButton(
-  onPressed: () {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => const ForgotPasswordPage()),
-    );
-  },
-  child: const Text('Forgot Password?'),
-),
-
+            onPressed: () async {
+              await authService.requestResetPassword();
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Password reset link sent to your email!'),
+                ),
+              );
+            },
+            child: const Text('Forgot Password?'),
+          ),
         ],
       ),
     );
