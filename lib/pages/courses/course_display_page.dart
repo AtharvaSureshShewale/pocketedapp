@@ -3,7 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:pocketed/widgets/shared_scaffold.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:pocketed/widgets/course_card.dart';
+import 'package:pocketed/pages/courses/course_card.dart';
 import 'package:pocketed/pages/courses/course_detail_page.dart';
 
 class CourseDisplayPage extends StatefulWidget {

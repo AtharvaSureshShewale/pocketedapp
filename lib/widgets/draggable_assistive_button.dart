@@ -19,6 +19,7 @@ class DraggableAssistiveButton extends StatefulWidget {
 class _DraggableAssistiveButtonState extends State<DraggableAssistiveButton> {
   double top = 500;
   double left = 20;
+  bool isDragging = false;
 
   @override
   Widget build(BuildContext context) {
@@ -26,36 +27,48 @@ class _DraggableAssistiveButtonState extends State<DraggableAssistiveButton> {
       return const SizedBox.shrink();
     }
 
-    return Positioned(
+    final screenSize = MediaQuery.of(context).size;
+
+    return AnimatedPositioned(
+      duration: const Duration(milliseconds: 200),
+      curve: Curves.easeOut,
       top: top,
       left: left,
-      child: Draggable(
-        feedback: buildButton(),
-        childWhenDragging: const SizedBox.shrink(),
-        onDragEnd: (details) {
-          final size = MediaQuery.of(context).size;
+      child: GestureDetector(
+        onPanStart: (_) => setState(() => isDragging = true),
+        onPanUpdate: (details) {
           setState(() {
-            left = details.offset.dx.clamp(0, size.width - 70);
-            top = details.offset.dy.clamp(0, size.height - 70);
+            left = (left + details.delta.dx).clamp(0.0, screenSize.width - 70);
+            top = (top + details.delta.dy).clamp(0.0, screenSize.height - 70);
           });
         },
-        child: GestureDetector(
-          onTap: widget.onTap,
-          child: buildButton(),
-        ),
+        onPanEnd: (_) => setState(() => isDragging = false),
+        onTap: widget.onTap,
+        child: buildButton(),
       ),
     );
   }
 
   Widget buildButton() {
-    return Container(
-      width: 60,
-      height: 60,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: Colors.black.withOpacity(0.6),
+    return AnimatedOpacity(
+      duration: const Duration(milliseconds: 200),
+      opacity: isDragging ? 0.7 : 1.0,
+      child: Container(
+        width: 60,
+        height: 60,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: Colors.black.withOpacity(0.6),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.2),
+              blurRadius: 6,
+              offset: const Offset(2, 2),
+            )
+          ],
+        ),
+        child: const Icon(Icons.smart_toy, color: Colors.white),
       ),
-      child: const Icon(Icons.smart_toy, color: Colors.white),
     );
   }
 }

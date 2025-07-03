@@ -1,6 +1,7 @@
-// lib/pages/home/home_page.dart
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:pocketed/auth/auth_service.dart';
+import 'package:pocketed/pages/blogs/blogs_section.dart';
 import 'package:pocketed/pages/courses/available_courses_list.dart';
 import 'package:pocketed/pages/courses/enrolled_courses_list.dart';
 import 'package:pocketed/services/course_service.dart';
@@ -19,41 +20,85 @@ class _HomePageState extends State<HomePage> {
   final CourseService courseService = CourseService();
 
   String _username = 'Loading...';
+  String _userEmail = '';
   bool _isLoading = true;
 
   List<Map<String, dynamic>> _allCourses = [];
   List<Map<String, dynamic>> _enrolledCourses = [];
+  List<Map<String, dynamic>> _blogs = [];
+  int _points = 0;
+
+  StreamSubscription<List<Map<String, dynamic>>>? _pointsSubscription;
 
   @override
   void initState() {
     super.initState();
     loadAllData();
+    _listenToPoints();
+  }
+
+  @override
+  void dispose() {
+    _pointsSubscription?.cancel();
+    super.dispose();
   }
 
   Future<void> loadAllData() async {
     try {
-      final userId = Supabase.instance.client.auth.currentUser?.id;
-      final username = await authService.getCurrentUsername();
+      final user = Supabase.instance.client.auth.currentUser;
+      if (user == null) return;
 
-      if (userId == null) return;
+      final userId = user.id;
+      final username = await authService.getCurrentUsername();
+      final email = user.email ?? '';
 
       final enrolled = await courseService.getEnrolledCoursesWithProgress(userId);
       final all = await courseService.getAllCourses();
+
+      final blogs = await Supabase.instance.client
+          .from('blogs')
+          .select()
+          .eq('is_published', true)
+          .order('created_at', ascending: false);
+
+      final profile = await Supabase.instance.client
+          .from('profiles')
+          .select('points')
+          .eq('id', userId)
+          .maybeSingle();
 
       if (!mounted) return;
 
       setState(() {
         _username = username ?? 'User';
+        _userEmail = email;
         _allCourses = all;
         _enrolledCourses = enrolled;
+        _blogs = blogs;
+        _points = profile?['points'] ?? 0;
         _isLoading = false;
       });
     } catch (e) {
       if (!mounted) return;
       setState(() => _isLoading = false);
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Failed to load data: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to load data: $e')));
     }
+  }
+
+  void _listenToPoints() {
+    final userId = Supabase.instance.client.auth.currentUser?.id;
+    if (userId == null) return;
+
+    _pointsSubscription = Supabase.instance.client
+        .from('profiles:id=eq.$userId')
+        .stream(primaryKey: ['id'])
+        .listen((event) {
+      if (event.isNotEmpty) {
+        setState(() {
+          _points = event.first['points'] ?? 0;
+        });
+      }
+    });
   }
 
   void logout() async {
@@ -64,15 +109,12 @@ class _HomePageState extends State<HomePage> {
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Logout failed: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Logout failed: $e')));
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final userEmail = authService.getCurrentUserEmail();
-
     return SharedScaffold(
       currentRoute: '/home',
       showNavbar: true,
@@ -94,22 +136,55 @@ class _HomePageState extends State<HomePage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Welcome, $_username!',
-                            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                        // 👋 Welcome and Email
+                        Text(
+                          'Welcome, $_username!',
+                          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                        ),
                         const SizedBox(height: 8),
-                        Text('Email: ${userEmail ?? "Not available"}'),
+                        Text('Email: $_userEmail'),
+
+                        // 🌟 Points
+                        const SizedBox(height: 16),
+                        Row(
+                          children: [
+                            const Icon(Icons.star, color: Colors.amber),
+                            const SizedBox(width: 6),
+                            Text('Points: $_points', style: const TextStyle(fontSize: 16)),
+                          ],
+                        ),
+
                         const SizedBox(height: 24),
+
+                        // 📚 Courses
                         if (_enrolledCourses.isNotEmpty) ...[
-                          const Text('Your Enrolled Courses',
-                              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
+                          const Text(
+                            'Your Enrolled Courses',
+                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                          ),
                           const SizedBox(height: 12),
                           EnrolledCoursesList(enrolledCourses: _enrolledCourses),
                         ] else ...[
-                          const Text('Available Courses',
-                              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
+                          const Text(
+                            'Available Courses',
+                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                          ),
                           const SizedBox(height: 12),
                           AvailableCoursesList(allCourses: _allCourses),
                         ],
+
+                        const SizedBox(height: 32),
+
+                        // 📝 Blogs
+                        const Text(
+                          'Latest Blogs',
+                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                        ),
+                        const SizedBox(height: 12),
+                        BlogSection(
+                          blogPosts: _blogs.map((blog) => blog.map((key, value) => MapEntry(key, value?.toString() ?? ""))).toList(),
+                          isHorizontal: true,
+                        ),
                       ],
                     ),
                   ),

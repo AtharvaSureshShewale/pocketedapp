@@ -1,6 +1,6 @@
 // lib/pages/home/available_courses_list.dart
 import 'package:flutter/material.dart';
-import 'package:pocketed/widgets/course_card.dart';
+import 'package:pocketed/pages/courses/course_card.dart';
 import 'package:pocketed/pages/courses/course_detail_page.dart';
 
 class AvailableCoursesList extends StatelessWidget {

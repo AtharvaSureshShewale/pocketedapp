@@ -5,6 +5,8 @@
         android:icon="@mipmap/ic_launcher"
         android:enableOnBackInvokedCallback="true"
         >
+        <uses-permission android:name="android.permission.INTERNET"/>
+
         <activity
             android:name=".MainActivity"
             android:exported="true"
