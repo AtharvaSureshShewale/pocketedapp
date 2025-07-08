@@ -1,136 +1,70 @@
-// import 'package:flutter/material.dart';
-// import 'package:pocketed/widgets/shared_scaffold.dart';
-// import 'package:supabase_flutter/supabase_flutter.dart';
-// import 'package:pocketed/pages/blogs/blog_detail_page.dart';
-// import 'package:pocketed/pages/blogs/blog_card.dart';
+import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:pocketed/pages/blogs/blogs_section.dart';
+import 'package:pocketed/widgets/shared_scaffold.dart'; // Your shared scaffold
 
-// class BlogPage extends StatefulWidget {
-//   const BlogPage({super.key});
+class BlogDisplayPage extends StatefulWidget {
+  const BlogDisplayPage({super.key});
 
-//   @override
-//   State<BlogPage> createState() => _BlogPageState();
-// }
+  @override
+  State<BlogDisplayPage> createState() => _BlogDisplayPageState();
+}
 
-// class _BlogPageState extends State<BlogPage> {
-//   final SupabaseClient supabase = Supabase.instance.client;
+class _BlogDisplayPageState extends State<BlogDisplayPage> {
+  final SupabaseClient supabase = Supabase.instance.client;
 
-//   List<Map<String, dynamic>> _blogs = [];
-//   Set<String> _readBlogIds = {};
-//   bool _isLoading = true;
+  List<Map<String, dynamic>> blogs = [];
+  bool isLoading = true;
 
-//   @override
-//   void initState() {
-//     super.initState();
-//     loadData();
-//   }
+  @override
+  void initState() {
+    super.initState();
+    fetchBlogs();
+  }
 
-//   Future<void> loadData() async {
-//     final userId = supabase.auth.currentUser?.id;
-//     if (userId == null) return;
+  Future<void> fetchBlogs() async {
+    setState(() => isLoading = true);
 
-//     setState(() => _isLoading = true);
+    try {
+      final response = await supabase
+          .from('blogs')
+          .select('*')
+          .order('created_at', ascending: false);
 
-//     try {
-//       final blogsResponse = await supabase
-//           .from('blogs')
-//           .select()
-//           .eq('is_published', true)
-//           .order('created_at', ascending: false) as List;
+      setState(() {
+        blogs = List<Map<String, dynamic>>.from(response);
+        isLoading = false;
+      });
+    } catch (e) {
+      debugPrint('Error fetching blogs: $e');
+      setState(() => isLoading = false);
+    }
+  }
 
-//       final readsResponse = await supabase
-//           .from('blog_reads')
-//           .select('blog_id')
-//           .eq('user_id', userId) as List;
-
-//       final readIds = readsResponse.map((r) => r['blog_id'] as String).toSet();
-
-//       if (!mounted) return;
-
-//       setState(() {
-//         _blogs = List<Map<String, dynamic>>.from(blogsResponse);
-//         _readBlogIds = readIds;
-//         _isLoading = false;
-//       });
-//     } catch (e) {
-//       if (!mounted) return;
-//       setState(() => _isLoading = false);
-//       ScaffoldMessenger.of(context).showSnackBar(
-//         SnackBar(content: Text('Error loading blogs: $e')),
-//       );
-//     }
-//   }
-
-//   @override
-//   Widget build(BuildContext context) {
-//     return SharedScaffold(
-//       currentRoute: '/blog',
-//       showNavbar: true,
-//       appBar: AppBar(
-//         title: const Text("All Blogs"),
-//         centerTitle: true,
-//       ),
-//       body: _isLoading
-//           ? const Center(child: CircularProgressIndicator())
-//           : RefreshIndicator(
-//               onRefresh: loadData,
-//               child: _blogs.isEmpty
-//                   ? const Center(child: Text("No blogs available."))
-//                   : ListView.builder(
-//                       padding: const EdgeInsets.all(16),
-//                       itemCount: _blogs.length,
-//                       itemBuilder: (context, index) {
-//                         final blog = _blogs[index];
-//                         final isRead = _readBlogIds.contains(blog['id']);
-
-//                         return Stack(
-//                           children: [
-//                             Padding(
-//                               padding: const EdgeInsets.only(bottom: 16),
-//                               child: BlogCard(
-//                                 title: blog['title'] ?? '',
-//                                 coverImageUrl: blog['cover_image_url'] ?? '',
-//                                 content: blog['description'] ?? '',
-//                                 readTime: blog['read_time'] ?? '',
-//                                 publishedAt:
-//                                     blog['published_at'] ?? blog['created_at'],
-//                                 onTap: () {
-//                                   Navigator.push(
-//                                     context,
-//                                     MaterialPageRoute(
-//                                       builder: (_) => BlogDetailPage(blog: blog),
-//                                     ),
-//                                   );
-//                                 },
-//                               ),
-//                             ),
-//                             if (isRead)
-//                               Positioned(
-//                                 top: 8,
-//                                 right: 8,
-//                                 child: Container(
-//                                   padding: const EdgeInsets.symmetric(
-//                                     horizontal: 8,
-//                                     vertical: 4,
-//                                   ),
-//                                   decoration: BoxDecoration(
-//                                     color: Colors.blue,
-//                                     borderRadius: BorderRadius.circular(12),
-//                                   ),
-//                                   child: const Text(
-//                                     'Read',
-//                                     style: TextStyle(
-//                                       color: Colors.white,
-//                                       fontSize: 12,
-//                                       fontWeight: FontWeight.w500,
-//                                     ),
-//                                   ),
-//                                 ),
-//                               ),
-//                           ],
-//                         );
-//                       },
-//                     ),
-//             ),
-//     );
-//   }
-// }
+  @override
+  Widget build(BuildContext context) {
+    return SharedScaffold(
+      currentRoute: '/blogDisplay',
+      showNavbar: true,
+      appBar: AppBar(title: const Text('Blogs')),
+      body: isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : blogs.isEmpty
+              ? const Center(child: Text('No blogs found.'))
+              : Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: BlogSection(
+                    blogPosts: blogs,
+                    isHorizontal: false,
+                    onCardTap: (blog) async {
+                      Navigator.pushNamed(context, '/blogDetails', arguments: blog);
+                      setState(() {
+                        final index = blogs.indexWhere((b) => b['id'] == blog['id']);
+                        if (index != -1) blogs[index]['isRead'] = true;
+                      });
+                    },
+                  ),
+                ),
+    );
+  }
+}

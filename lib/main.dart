@@ -7,8 +7,10 @@ import 'package:pocketed/pages/auth_pages/resetPassword_page.dart';
 import 'package:pocketed/pages/blogs/blog_detail_page.dart';
 import 'package:pocketed/pages/blogs/blog_page.dart';
 import 'package:pocketed/pages/courses/course_display_page.dart';
+import 'package:pocketed/pages/mentor/mentor_talks_screen.dart';
 import 'package:pocketed/utils/constant.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:pocketed/pages/blogs/blog_display_page.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
@@ -51,12 +53,13 @@ class MyApp extends StatelessWidget {
         '/reset': (context) => const ResetpasswordPage(),
         '/assistive': (context) => const AssistivePage(),
         '/courses': (context) => const CourseDisplayPage(),
+        '/mentor': (context) => const MentorTalksScreen(),
+        '/blogDisplay': (context) => const BlogDisplayPage(),
+        // 🔥 Removed '/blogDetails' from static routes
       },
-      // 👇 Dynamic route for blog detail
       onGenerateRoute: (settings) {
-        if (settings.name == '/blogDetail') {
-          final blog =
-              settings.arguments as Map<String, String>; 
+        if (settings.name == '/blogDetails') {
+          final blog = settings.arguments as Map<String, dynamic>;
           return MaterialPageRoute(
             builder: (context) => BlogDetailPage(blog: blog),
           );

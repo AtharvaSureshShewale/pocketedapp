@@ -78,7 +78,7 @@ class _BlogDetailPageState extends State<BlogDetailPage> {
   Widget build(BuildContext context) {
     final title = widget.blog['title'] ?? '';
     final coverImageUrl = widget.blog['coverImageUrl'] ?? '';
-    final description = widget.blog['description'] ?? '';
+    final description = widget.blog['content'] ?? '';
     final readTime = widget.blog['readTime'] ?? '';
     final publishedAt = widget.blog['publishedAt'] ?? '';
 

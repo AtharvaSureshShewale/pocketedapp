@@ -5,6 +5,7 @@ import 'package:pocketed/pages/blogs/blogs_section.dart';
 import 'package:pocketed/pages/courses/available_courses_list.dart';
 import 'package:pocketed/pages/courses/enrolled_courses_list.dart';
 import 'package:pocketed/services/course_service.dart';
+import 'package:pocketed/services/supabase_service.dart';
 import 'package:pocketed/widgets/shared_scaffold.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -26,6 +27,29 @@ class _HomePageState extends State<HomePage> {
   List<Map<String, dynamic>> _allCourses = [];
   List<Map<String, dynamic>> _enrolledCourses = [];
   List<Map<String, dynamic>> _blogs = [];
+
+  List<Map<String, dynamic>> blogs = [];
+  bool isLoading = true;
+
+  Future<void> fetchBlogs() async {
+    setState(() => isLoading = true);
+
+    try {
+      final response = await supabase
+          .from('blogs')
+          .select('*')
+          .order('created_at', ascending: false);
+
+      setState(() {
+        blogs = List<Map<String, dynamic>>.from(response);
+        isLoading = false;
+      });
+    } catch (e) {
+      debugPrint('Error fetching blogs: $e');
+      setState(() => isLoading = false);
+    }
+  }
+
   int _points = 0;
 
   StreamSubscription<List<Map<String, dynamic>>>? _pointsSubscription;
@@ -34,6 +58,7 @@ class _HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
     loadAllData();
+    fetchBlogs();
     _listenToPoints();
   }
 
@@ -52,7 +77,9 @@ class _HomePageState extends State<HomePage> {
       final username = await authService.getCurrentUsername();
       final email = user.email ?? '';
 
-      final enrolled = await courseService.getEnrolledCoursesWithProgress(userId);
+      final enrolled = await courseService.getEnrolledCoursesWithProgress(
+        userId,
+      );
       final all = await courseService.getAllCourses();
 
       final blogs = await Supabase.instance.client
@@ -81,7 +108,9 @@ class _HomePageState extends State<HomePage> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to load data: $e')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to load data: $e')));
     }
   }
 
@@ -93,12 +122,12 @@ class _HomePageState extends State<HomePage> {
         .from('profiles:id=eq.$userId')
         .stream(primaryKey: ['id'])
         .listen((event) {
-      if (event.isNotEmpty) {
-        setState(() {
-          _points = event.first['points'] ?? 0;
+          if (event.isNotEmpty) {
+            setState(() {
+              _points = event.first['points'] ?? 0;
+            });
+          }
         });
-      }
-    });
   }
 
   void logout() async {
@@ -109,7 +138,9 @@ class _HomePageState extends State<HomePage> {
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Logout failed: $e')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Logout failed: $e')));
     }
   }
 
@@ -139,7 +170,10 @@ class _HomePageState extends State<HomePage> {
                         // 👋 Welcome and Email
                         Text(
                           'Welcome, $_username!',
-                          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                          style: const TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                         const SizedBox(height: 8),
                         Text('Email: $_userEmail'),
@@ -150,7 +184,10 @@ class _HomePageState extends State<HomePage> {
                           children: [
                             const Icon(Icons.star, color: Colors.amber),
                             const SizedBox(width: 6),
-                            Text('Points: $_points', style: const TextStyle(fontSize: 16)),
+                            Text(
+                              'Points: $_points',
+                              style: const TextStyle(fontSize: 16),
+                            ),
                           ],
                         ),
 
@@ -160,14 +197,22 @@ class _HomePageState extends State<HomePage> {
                         if (_enrolledCourses.isNotEmpty) ...[
                           const Text(
                             'Your Enrolled Courses',
-                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                           const SizedBox(height: 12),
-                          EnrolledCoursesList(enrolledCourses: _enrolledCourses),
+                          EnrolledCoursesList(
+                            enrolledCourses: _enrolledCourses,
+                          ),
                         ] else ...[
                           const Text(
                             'Available Courses',
-                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                           const SizedBox(height: 12),
                           AvailableCoursesList(allCourses: _allCourses),
@@ -178,12 +223,28 @@ class _HomePageState extends State<HomePage> {
                         // 📝 Blogs
                         const Text(
                           'Latest Blogs',
-                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                         const SizedBox(height: 12),
                         BlogSection(
-                          blogPosts: _blogs.map((blog) => blog.map((key, value) => MapEntry(key, value?.toString() ?? ""))).toList(),
+                          blogPosts: blogs,
                           isHorizontal: true,
+                          onCardTap: (blog) async {
+                            Navigator.pushNamed(
+                              context,
+                              '/blogDetails',
+                              arguments: blog,
+                            );
+                            setState(() {
+                              final index = blogs.indexWhere(
+                                (b) => b['id'] == blog['id'],
+                              );
+                              if (index != -1) blogs[index]['isRead'] = true;
+                            });
+                          },
                         ),
                       ],
                     ),

@@ -3,21 +3,21 @@ import 'package:flutter/material.dart';
 class BlogCard extends StatelessWidget {
   final String title;
   final String coverImageUrl;
-  final String content;
   final String readTime;
   final String publishedAt;
   final bool isHorizontal;
+  final String content;
   final VoidCallback? onTap;
 
   const BlogCard({
     super.key,
     required this.title,
     required this.coverImageUrl,
-    required this.content,
     required this.readTime,
     required this.publishedAt,
     this.isHorizontal = false,
     this.onTap,
+    this.content = '',
   });
 
   @override
@@ -42,40 +42,27 @@ class BlogCard extends StatelessWidget {
                     height: 140,
                     width: width,
                     fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) => const SizedBox(
-                      height: 140,
-                      child: Center(child: Icon(Icons.broken_image)),
-                    ),
+                    errorBuilder: (context, error, stackTrace) =>
+                        const SizedBox(height: 140, child: Center(child: Icon(Icons.broken_image))),
                   ),
                 ),
-              Expanded( // Allows text section to take remaining space
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        style: Theme.of(context).textTheme.titleMedium,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '🕒 $readTime • 📅 $publishedAt',
-                        style: const TextStyle(color: Colors.grey, fontSize: 12),
-                      ),
-                      const SizedBox(height: 8),
-                      Expanded(
-                        child: Text(
-                          content,
-                          maxLines: 3,
-                          overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context).textTheme.bodyMedium,
-                        ),
-                      ),
-                    ],
-                  ),
+              Padding(
+                padding: const EdgeInsets.only(left: 12, right: 12, top: 12, bottom: 0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: Theme.of(context).textTheme.titleMedium,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '🕒 $readTime • 📅 $publishedAt',
+                      style: const TextStyle(color: Colors.grey, fontSize: 12),
+                    ),
+                  ],
                 ),
               ),
             ],

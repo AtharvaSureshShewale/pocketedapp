@@ -26,7 +26,12 @@ class SharedScaffold extends StatelessWidget {
             onTap: () {
               Navigator.pushNamed(context, '/assistive');
             },
-            allowedRoutes: ['/home', '/blog', '/courses'], // ⬅️ allow on courses page
+            allowedRoutes: [
+              '/home',
+              '/blog',
+              '/courses',
+              '/mentor',
+            ],
             currentRoute: currentRoute,
           ),
         ],
@@ -34,6 +39,11 @@ class SharedScaffold extends StatelessWidget {
       bottomNavigationBar: showNavbar
           ? BottomNavigationBar(
               currentIndex: _getCurrentIndex(),
+              selectedItemColor: Colors.blue,
+              unselectedItemColor: Colors.black,
+              selectedIconTheme: const IconThemeData(size: 28),
+              unselectedIconTheme: const IconThemeData(size: 24),
+              type: BottomNavigationBarType.fixed,
               onTap: (index) {
                 switch (index) {
                   case 0:
@@ -42,13 +52,18 @@ class SharedScaffold extends StatelessWidget {
                     }
                     break;
                   case 1:
-                    if (currentRoute != '/blog') {
-                      Navigator.pushReplacementNamed(context, '/blog');
+                    if (currentRoute != '/blogDisplay') {
+                      Navigator.pushReplacementNamed(context, '/blogDisplay');
                     }
                     break;
                   case 2:
                     if (currentRoute != '/courses') {
                       Navigator.pushReplacementNamed(context, '/courses');
+                    }
+                    break;
+                  case 3:
+                    if (currentRoute != '/mentor') {
+                      Navigator.pushReplacementNamed(context, '/mentor');
                     }
                     break;
                 }
@@ -66,6 +81,10 @@ class SharedScaffold extends StatelessWidget {
                   icon: Icon(Icons.school),
                   label: 'Courses',
                 ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.people),
+                  label: 'Mentor',
+                ),
               ],
             )
           : null,
@@ -76,10 +95,12 @@ class SharedScaffold extends StatelessWidget {
     switch (currentRoute) {
       case '/home':
         return 0;
-      case '/blog':
+      case '/blogDisplay': // ✅ FIXED: matches route in onTap
         return 1;
       case '/courses':
         return 2;
+      case '/mentor':
+        return 3;
       default:
         return 0;
     }
