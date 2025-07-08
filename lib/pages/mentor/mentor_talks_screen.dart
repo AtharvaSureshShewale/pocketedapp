@@ -1,30 +1,37 @@
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:pocketed/widgets/shared_scaffold.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
-class MentorTalksScreen extends StatelessWidget {
+class MentorTalksScreen extends StatefulWidget {
   const MentorTalksScreen({Key? key}) : super(key: key);
 
-  final mentors = const [
-    {
-      'name': 'Jared Deul',
-      'title': 'Finance Professor',
-      'quote': 'Leadership is action, not position',
-      'image': 'assets/images/jared.png',
-    },
-    {
-      'name': 'Raul Fernandes',
-      'title': 'Finance Professor',
-      'quote': 'An investment in Knowledge pays the best interest',
-      'image': 'assets/images/raul.png',
-    },
-    {
-      'name': "Jaden D'souza",
-      'title': 'Finance Professor',
-      'quote': "Believe you can and you're halfway there",
-      'image': 'assets/images/jaden.png',
-    },
-  ];
+  @override
+  State<MentorTalksScreen> createState() => _MentorTalksScreenState();
+}
+
+class _MentorTalksScreenState extends State<MentorTalksScreen> {
+  List<dynamic> mentors = [];
+  bool isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    fetchMentors();
+  }
+
+  Future<void> fetchMentors() async {
+    final supabase = Supabase.instance.client;
+    final data = await supabase
+        .from('mentors')
+        .select()
+        .order('name', ascending: true);
+
+    setState(() {
+      mentors = data;
+      isLoading = false;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -32,10 +39,6 @@ class MentorTalksScreen extends StatelessWidget {
       currentRoute: '/mentor',
       showNavbar: true,
       appBar: AppBar(
-        // leading: IconButton(
-        //   icon: const Icon(Icons.arrow_back, color: Colors.black),
-        //   onPressed: () => Navigator.pop(context),
-        // ),
         title: Center(
           child: RichText(
             text: const TextSpan(
@@ -55,19 +58,21 @@ class MentorTalksScreen extends StatelessWidget {
         backgroundColor: Colors.white,
         elevation: 0,
       ),
-      body: ListView.builder(
-        padding: const EdgeInsets.all(16),
-        itemCount: mentors.length,
-        itemBuilder: (context, index) {
-          final mentor = mentors[index];
-          return MentorCard(
-            name: mentor['name']!,
-            title: mentor['title']!,
-            quote: mentor['quote']!,
-            imagePath: mentor['image']!,
-          );
-        },
-      ),
+      body: isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : ListView.builder(
+              padding: const EdgeInsets.all(16),
+              itemCount: mentors.length,
+              itemBuilder: (context, index) {
+                final mentor = mentors[index];
+                return MentorCard(
+                  name: mentor['name'] ?? 'Unknown',
+                  title: mentor['title'] ?? '',
+                  quote: mentor['quote'] ?? '',
+                  imagePath: mentor['image_url'] ?? '',
+                );
+              },
+            ),
     );
   }
 }
@@ -103,7 +108,9 @@ class MentorCard extends StatelessWidget {
             backgroundColor: Colors.orange,
             child: CircleAvatar(
               radius: 32,
-              backgroundImage: AssetImage(imagePath),
+              backgroundImage: imagePath.isNotEmpty
+                  ? NetworkImage(imagePath)
+                  : const AssetImage('assets/images/default_avatar.png') as ImageProvider,
             ),
           ),
           const SizedBox(width: 12),
@@ -111,16 +118,10 @@ class MentorCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(name,
-                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                Text(title,
-                    style: const TextStyle(
-                        fontSize: 14,
-                        color: Colors.blue,
-                        fontWeight: FontWeight.w500)),
+                Text(name, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                Text(title, style: const TextStyle(fontSize: 14, color: Colors.blue, fontWeight: FontWeight.w500)),
                 const SizedBox(height: 4),
-                Text(quote,
-                    style: const TextStyle(fontSize: 12, color: Colors.black87)),
+                Text(quote, style: const TextStyle(fontSize: 12, color: Colors.black87)),
                 const SizedBox(height: 8),
                 Row(
                   children: const [
