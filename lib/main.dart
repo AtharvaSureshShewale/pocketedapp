@@ -8,6 +8,11 @@ import 'package:pocketed/pages/blogs/blog_detail_page.dart';
 import 'package:pocketed/pages/blogs/blog_page.dart';
 import 'package:pocketed/pages/courses/course_display_page.dart';
 import 'package:pocketed/pages/mentor/mentor_talks_screen.dart';
+import 'package:pocketed/pages/quiz/daily_quiz_page.dart';
+import 'package:pocketed/pages/quiz/quiz_admin_page.dart';
+import 'package:pocketed/pages/quiz/quiz_question_page.dart';
+import 'package:pocketed/pages/quiz/quiz_results_page.dart';
+import 'package:pocketed/pages/quiz/scoreboard_page.dart';
 import 'package:pocketed/utils/constant.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:pocketed/pages/blogs/blog_display_page.dart';
@@ -55,6 +60,9 @@ class MyApp extends StatelessWidget {
         '/courses': (context) => const CourseDisplayPage(),
         '/mentor': (context) => const MentorTalksScreen(),
         '/blogDisplay': (context) => const BlogDisplayPage(),
+        '/quiz': (context) => const DailyQuizPage(),
+        '/quiz/scoreboard': (context) => const ScoreboardPage(),
+        '/quiz/admin': (context) => const QuizAdminPage(),
         // 🔥 Removed '/blogDetails' from static routes
       },
       onGenerateRoute: (settings) {
@@ -62,6 +70,16 @@ class MyApp extends StatelessWidget {
           final blog = settings.arguments as Map<String, dynamic>;
           return MaterialPageRoute(
             builder: (context) => BlogDetailPage(blog: blog),
+          );
+        } else if (settings.name == '/quiz/questions') {
+          final args = settings.arguments as Map<String, dynamic>;
+          return MaterialPageRoute(
+            builder: (context) => QuizQuestionPage(quiz: args['quiz']),
+          );
+        } else if (settings.name == '/quiz/results') {
+          final args = settings.arguments as Map<String, dynamic>;
+          return MaterialPageRoute(
+            builder: (context) => QuizResultsPage(attemptId: args['attemptId']),
           );
         }
         return null;

@@ -31,6 +31,7 @@ class SharedScaffold extends StatelessWidget {
               '/blog',
               '/courses',
               '/mentor',
+              '/quiz',
             ],
             currentRoute: currentRoute,
           ),
@@ -66,6 +67,11 @@ class SharedScaffold extends StatelessWidget {
                       Navigator.pushReplacementNamed(context, '/mentor');
                     }
                     break;
+                  case 4:
+                    if (currentRoute != '/quiz') {
+                      Navigator.pushReplacementNamed(context, '/quiz');
+                    }
+                    break;
                 }
               },
               items: const [
@@ -85,6 +91,10 @@ class SharedScaffold extends StatelessWidget {
                   icon: Icon(Icons.people),
                   label: 'Mentor',
                 ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.quiz),
+                  label: 'Quiz',
+                ),
               ],
             )
           : null,
@@ -101,6 +111,8 @@ class SharedScaffold extends StatelessWidget {
         return 2;
       case '/mentor':
         return 3;
+      case '/quiz':
+        return 4;
       default:
         return 0;
     }
