@@ -429,6 +429,15 @@ class _HomePageState extends State<HomePage> {
                                       },
                                       child: const Text('Check Progression'),
                                     ),
+                                    ElevatedButton(
+                                      onPressed: () async {
+                                        await quiz_service.generateAutomatedDailyQuiz();
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(content: Text('Generated new quiz')),
+                                        );
+                                      },
+                                      child: const Text('Generate Quiz'),
+                                    ),
                                   ],
                                 ),
                               ],

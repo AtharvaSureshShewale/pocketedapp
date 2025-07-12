@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:pocketed/models/quiz_models.dart';
-import 'package:pocketed/services/quiz_service.dart';
+import 'package:pocketed/services/quiz_service.dart' as quiz_service;
 import 'package:pocketed/widgets/shared_scaffold.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -21,6 +21,17 @@ class _DailyQuizPageState extends State<DailyQuizPage> {
   void initState() {
     super.initState();
     _loadQuizProgression();
+    _initializeAutomatedQuizGeneration();
+  }
+
+  Future<void> _initializeAutomatedQuizGeneration() async {
+    try {
+      await quiz_service.initializeAutomatedQuizGeneration();
+      // Reload progression after potential quiz generation
+      _loadQuizProgression();
+    } catch (e) {
+      print('Error initializing automated quiz generation: $e');
+    }
   }
 
   Future<void> _loadQuizProgression() async {
@@ -30,8 +41,8 @@ class _DailyQuizPageState extends State<DailyQuizPage> {
         _errorMessage = null;
       });
 
-      final progression = await getUserQuizProgression();
-      final currentDay = await getUserCurrentDay();
+      final progression = await quiz_service.getUserQuizProgression();
+      final currentDay = await quiz_service.getUserCurrentDay();
 
       setState(() {
         _quizProgression = progression;
@@ -64,9 +75,7 @@ class _DailyQuizPageState extends State<DailyQuizPage> {
     Navigator.pushNamed(context, '/quiz/scoreboard');
   }
   
-  void _goToAdminPage() {
-    Navigator.pushNamed(context, '/quiz/admin');
-  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -74,13 +83,6 @@ class _DailyQuizPageState extends State<DailyQuizPage> {
       currentRoute: '/quiz',
       appBar: AppBar(
         title: const Text('Daily Quizzes'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.admin_panel_settings),
-            onPressed: _goToAdminPage,
-            tooltip: 'Admin Panel',
-          ),
-        ],
       ),
       showNavbar: true,
       body: _buildBody(),
@@ -131,11 +133,7 @@ class _DailyQuizPageState extends State<DailyQuizPage> {
               onPressed: _loadQuizProgression,
               child: const Text('Refresh'),
             ),
-            const SizedBox(height: 16),
-            TextButton(
-              onPressed: _goToAdminPage,
-              child: const Text('Generate New Quiz (Admin)'),
-            ),
+
           ],
         ),
       );

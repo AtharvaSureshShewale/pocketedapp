@@ -740,3 +740,317 @@ Future<int> saveGeneratedQuiz(Map<String, dynamic> quizData) async {
   
   return quizId;
 } 
+
+/// Generate a new daily quiz automatically
+Future<void> generateAutomatedDailyQuiz() async {
+  try {
+    // Get the next day number
+    final nextDay = await getNextDayNumber();
+    
+    // Generate quiz content using AI
+    final quizContent = await generateQuizContent(nextDay);
+    
+    // Create the quiz
+    final quizResponse = await supabase
+        .from('quizzes')
+        .insert({
+          'title': quizContent['title'],
+          'description': quizContent['description'],
+          'day_number': nextDay,
+          'points_per_question': 10,
+          'is_active': true,
+        })
+        .select()
+        .single();
+    
+    final quizId = quizResponse['id'];
+    
+    // Create questions for the quiz
+    for (var question in quizContent['questions']) {
+      await supabase.from('quiz_questions').insert({
+        'quiz_id': quizId,
+        'question_text': question['question'],
+        'option_a': question['options']['A'],
+        'option_b': question['options']['B'],
+        'option_c': question['options']['C'],
+        'option_d': question['options']['D'],
+        'correct_option': question['correct_answer'],
+        'points': 10,
+      });
+    }
+    
+    print('✅ Generated quiz for Day $nextDay: ${quizContent['title']}');
+  } catch (e) {
+    print('❌ Error generating daily quiz: $e');
+    throw Exception('Failed to generate daily quiz: $e');
+  }
+}
+
+/// Get the next day number for quiz generation
+Future<int> getNextDayNumber() async {
+  try {
+    final response = await supabase
+        .from('quizzes')
+        .select('day_number')
+        .order('day_number', ascending: false)
+        .limit(1);
+    
+    if (response.isEmpty) {
+      return 1;
+    }
+    
+    return (response.first['day_number'] as int) + 1;
+  } catch (e) {
+    print('Error getting next day number: $e');
+    return 1;
+  }
+}
+
+/// Generate quiz content using AI
+Future<Map<String, dynamic>> generateQuizContent(int dayNumber) async {
+  final model = GenerativeModel(
+    model: 'gemini-2.0-flash-exp',
+    apiKey: 'AIzaSyBRUCEwpquGdDx4tWZdwed_i5-LCWPTQkg',
+  );
+
+  final financeTopics = [
+    'Personal Budgeting',
+    'Investment Basics',
+    'Credit and Debt Management',
+    'Emergency Funds',
+    'Retirement Planning',
+    'Tax Basics',
+    'Insurance Fundamentals',
+    'Real Estate Investment',
+    'Stock Market Basics',
+    'Cryptocurrency Fundamentals',
+    'Financial Goal Setting',
+    'Risk Management',
+    'Compound Interest',
+    'Diversification',
+    'Financial Statements',
+    'Business Finance',
+    'International Finance',
+    'Behavioral Finance',
+    'Financial Technology',
+    'Sustainable Investing',
+  ];
+
+  final topic = financeTopics[(dayNumber - 1) % financeTopics.length];
+  
+  final prompt = '''
+Generate a finance quiz for Day $dayNumber focusing on "$topic".
+
+Create:
+1. A quiz title that includes the day number and topic
+2. A brief description explaining what the quiz covers
+3. 5 multiple choice questions with 4 options each (A, B, C, D)
+4. One correct answer for each question
+
+Requirements:
+- Questions should be educational and practical
+- Difficulty should be beginner to intermediate
+- Focus on real-world financial concepts
+- Make it engaging and informative
+
+Format the response as JSON:
+{
+  "title": "Day $dayNumber: [Topic] - [Subtitle]",
+  "description": "[Brief description]",
+  "questions": [
+    {
+      "question": "[Question text]",
+      "options": {
+        "A": "[Option A]",
+        "B": "[Option B]", 
+        "C": "[Option C]",
+        "D": "[Option D]"
+      },
+      "correct_answer": "[A/B/C/D]"
+    }
+  ]
+}
+''';
+
+  try {
+    final response = await model.generateContent([Content.text(prompt)]);
+    final responseText = response.text ?? '';
+    
+    // Extract JSON from response
+    final jsonMatch = RegExp(r'```(?:json)?\s*({[\s\S]*?})\s*```').firstMatch(responseText);
+    if (jsonMatch != null) {
+      final jsonString = jsonMatch.group(1);
+      if (jsonString != null) {
+        return jsonDecode(jsonString);
+      }
+    }
+    
+    // Fallback: try to find JSON without code blocks
+    final jsonPattern = RegExp(r'\{[\s\S]*\}');
+    final match = jsonPattern.firstMatch(responseText);
+    if (match != null) {
+      return jsonDecode(match.group(0)!);
+    }
+    
+    throw Exception('Could not parse AI response as JSON');
+  } catch (e) {
+    print('Error generating quiz content: $e');
+    // Return fallback quiz content
+    return _getFallbackQuizContent(dayNumber, topic);
+  }
+}
+
+/// Fallback quiz content if AI generation fails
+Map<String, dynamic> _getFallbackQuizContent(int dayNumber, String topic) {
+  final fallbackQuizzes = {
+    'Personal Budgeting': {
+      'title': 'Day $dayNumber: Personal Budgeting - Managing Your Money',
+      'description': 'Learn the fundamentals of creating and maintaining a personal budget.',
+      'questions': [
+        {
+          'question': 'What is the 50/30/20 budgeting rule?',
+          'options': {
+            'A': '50% needs, 30% wants, 20% savings',
+            'B': '50% savings, 30% needs, 20% wants',
+            'C': '50% wants, 30% savings, 20% needs',
+            'D': '50% needs, 30% savings, 20% wants'
+          },
+          'correct_answer': 'A'
+        },
+        {
+          'question': 'Which of the following is considered a "need" in budgeting?',
+          'options': {
+            'A': 'Entertainment subscriptions',
+            'B': 'Housing and utilities',
+            'C': 'Vacation expenses',
+            'D': 'Dining out'
+          },
+          'correct_answer': 'B'
+        },
+        {
+          'question': 'What is the purpose of tracking expenses?',
+          'options': {
+            'A': 'To impress friends with spending',
+            'B': 'To identify spending patterns and make better decisions',
+            'C': 'To avoid paying taxes',
+            'D': 'To get more credit cards'
+          },
+          'correct_answer': 'B'
+        },
+        {
+          'question': 'Which budgeting method involves using cash for different spending categories?',
+          'options': {
+            'A': 'Digital budgeting',
+            'B': 'Envelope method',
+            'C': 'Credit card method',
+            'D': 'Investment budgeting'
+          },
+          'correct_answer': 'B'
+        },
+        {
+          'question': 'What percentage of your income should you aim to save?',
+          'options': {
+            'A': 'At least 5%',
+            'B': 'At least 10%',
+            'C': 'At least 20%',
+            'D': 'All of the above are good targets'
+          },
+          'correct_answer': 'D'
+        }
+      ]
+    },
+    'Investment Basics': {
+      'title': 'Day $dayNumber: Investment Basics - Growing Your Wealth',
+      'description': 'Understand the fundamentals of investing and building wealth over time.',
+      'questions': [
+        {
+          'question': 'What is compound interest?',
+          'options': {
+            'A': 'Interest earned only on the principal amount',
+            'B': 'Interest earned on both principal and accumulated interest',
+            'C': 'A type of loan interest',
+            'D': 'Interest paid by the government'
+          },
+          'correct_answer': 'B'
+        },
+        {
+          'question': 'Which investment typically has the highest risk?',
+          'options': {
+            'A': 'Government bonds',
+            'B': 'Savings account',
+            'C': 'Individual stocks',
+            'D': 'Money market account'
+          },
+          'correct_answer': 'C'
+        },
+        {
+          'question': 'What is diversification?',
+          'options': {
+            'A': 'Putting all money in one investment',
+            'B': 'Spreading investments across different assets',
+            'C': 'Investing only in stocks',
+            'D': 'Avoiding all investments'
+          },
+          'correct_answer': 'B'
+        },
+        {
+          'question': 'What is a mutual fund?',
+          'options': {
+            'A': 'A single stock investment',
+            'B': 'A pool of money from many investors',
+            'C': 'A type of bank account',
+            'D': 'A government bond'
+          },
+          'correct_answer': 'B'
+        },
+        {
+          'question': 'What is the time value of money?',
+          'options': {
+            'A': 'Money is worth more today than in the future',
+            'B': 'Money loses value over time',
+            'C': 'Money has no time component',
+            'D': 'Money is always worth the same'
+          },
+          'correct_answer': 'A'
+        }
+      ]
+    }
+  };
+
+  return fallbackQuizzes[topic] ?? fallbackQuizzes['Personal Budgeting']!;
+}
+
+/// Check if today's quiz already exists
+Future<bool> todayQuizExists() async {
+  try {
+    final today = DateTime.now();
+    final response = await supabase
+        .from('quizzes')
+        .select('id')
+        .gte('created_at', DateTime(today.year, today.month, today.day).toIso8601String())
+        .lte('created_at', DateTime(today.year, today.month, today.day, 23, 59, 59).toIso8601String())
+        .maybeSingle();
+    
+    return response != null;
+  } catch (e) {
+    print('Error checking if today\'s quiz exists: $e');
+    return false;
+  }
+}
+
+/// Initialize automated quiz generation (call this when app starts)
+Future<void> initializeAutomatedQuizGeneration() async {
+  try {
+    // Check if today's quiz exists
+    final quizExists = await todayQuizExists();
+    
+    if (!quizExists) {
+      print('📝 No quiz for today found. Generating new quiz...');
+      await generateAutomatedDailyQuiz();
+    } else {
+      print('✅ Today\'s quiz already exists');
+    }
+  } catch (e) {
+    print('❌ Error initializing automated quiz generation: $e');
+  }
+} 
