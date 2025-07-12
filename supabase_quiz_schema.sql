@@ -65,6 +65,97 @@ CREATE TABLE IF NOT EXISTS public.profiles (
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Create user_quiz_progress table for tracking individual user progress
+CREATE TABLE IF NOT EXISTS user_quiz_progress (
+    id SERIAL PRIMARY KEY,
+    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+    current_day INTEGER DEFAULT 1,
+    total_days_completed INTEGER DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(user_id)
+);
+
+-- Add RLS policies for user_quiz_progress
+ALTER TABLE user_quiz_progress ENABLE ROW LEVEL SECURITY;
+
+-- Users can only see their own progress
+CREATE POLICY "Users can view own quiz progress" ON user_quiz_progress
+    FOR SELECT USING (auth.uid() = user_id);
+
+-- Users can insert their own progress
+CREATE POLICY "Users can insert own quiz progress" ON user_quiz_progress
+    FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+-- Users can update their own progress
+CREATE POLICY "Users can update own quiz progress" ON user_quiz_progress
+    FOR UPDATE USING (auth.uid() = user_id);
+
+-- Create function to automatically create progress record for new users
+CREATE OR REPLACE FUNCTION create_user_quiz_progress()
+RETURNS TRIGGER AS $$
+BEGIN
+    INSERT INTO user_quiz_progress (user_id, current_day, total_days_completed)
+    VALUES (NEW.id, 1, 0)
+    ON CONFLICT (user_id) DO NOTHING;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Create trigger to automatically create progress for new users
+DROP TRIGGER IF EXISTS create_user_quiz_progress_trigger ON auth.users;
+CREATE TRIGGER create_user_quiz_progress_trigger
+    AFTER INSERT ON auth.users
+    FOR EACH ROW
+    EXECUTE FUNCTION create_user_quiz_progress();
+
+-- Create function to update user progress when they complete a quiz
+CREATE OR REPLACE FUNCTION update_user_quiz_progress_on_completion()
+RETURNS TRIGGER AS $$
+DECLARE
+    quiz_day INTEGER;
+    current_user_day INTEGER;
+BEGIN
+    -- Only proceed if this is a completion
+    IF NEW.completed = true AND (OLD.completed = false OR OLD.completed IS NULL) THEN
+        -- Get the day number of the completed quiz
+        SELECT day_number INTO quiz_day
+        FROM quizzes
+        WHERE id = NEW.quiz_id;
+        
+        -- Get user's current day
+        SELECT current_day INTO current_user_day
+        FROM user_quiz_progress
+        WHERE user_id = NEW.user_id;
+        
+        -- If this quiz is for the user's current day, advance them
+        IF quiz_day = current_user_day THEN
+            UPDATE user_quiz_progress
+            SET current_day = current_day + 1,
+                total_days_completed = total_days_completed + 1,
+                updated_at = NOW()
+            WHERE user_id = NEW.user_id;
+        END IF;
+    END IF;
+    
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Create trigger to update progress when quiz is completed
+DROP TRIGGER IF EXISTS update_user_quiz_progress_trigger ON user_quiz_attempts;
+CREATE TRIGGER update_user_quiz_progress_trigger
+    AFTER UPDATE ON user_quiz_attempts
+    FOR EACH ROW
+    EXECUTE FUNCTION update_user_quiz_progress_on_completion();
+
+-- Insert initial progress for existing users (if any)
+INSERT INTO user_quiz_progress (user_id, current_day, total_days_completed)
+SELECT id, 1, 0
+FROM auth.users
+WHERE id NOT IN (SELECT user_id FROM user_quiz_progress)
+ON CONFLICT (user_id) DO NOTHING;
+
 -- Create trigger to update profiles when a user is created
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$

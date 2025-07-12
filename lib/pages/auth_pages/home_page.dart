@@ -6,6 +6,7 @@ import 'package:pocketed/pages/courses/available_courses_list.dart';
 import 'package:pocketed/pages/courses/enrolled_courses_list.dart';
 import 'package:pocketed/services/course_service.dart';
 import 'package:pocketed/services/leaderboard_service.dart' as leaderboard;
+import 'package:pocketed/services/quiz_service.dart' as quiz_service;
 import 'package:pocketed/services/supabase_service.dart';
 import 'package:pocketed/widgets/shared_scaffold.dart';
 import 'package:pocketed/widgets/leaderboard_card.dart';
@@ -316,6 +317,123 @@ class _HomePageState extends State<HomePage> {
                               (_blogSectionKey.currentState as dynamic).refreshReadStatus();
                             }
                           },
+                        ),
+
+                        const SizedBox(height: 32),
+
+                        // 🔧 Debug Tools
+                        const Text(
+                          '🔧 Debug Tools',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Card(
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Leaderboard & Blog Tools',
+                                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                                ),
+                                const SizedBox(height: 12),
+                                Wrap(
+                                  spacing: 8,
+                                  runSpacing: 8,
+                                  children: [
+                                    ElevatedButton(
+                                      onPressed: () async {
+                                        await leaderboard.initializeDatabase();
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(content: Text('Database initialized')),
+                                        );
+                                      },
+                                      child: const Text('Init DB'),
+                                    ),
+                                    ElevatedButton(
+                                      onPressed: () async {
+                                        await leaderboard.addTestData();
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(content: Text('Test data added')),
+                                        );
+                                      },
+                                      child: const Text('Add Test Data'),
+                                    ),
+                                    ElevatedButton(
+                                      onPressed: () async {
+                                        await leaderboard.syncLeaderboardData();
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(content: Text('Leaderboard synced')),
+                                        );
+                                      },
+                                      child: const Text('Sync Leaderboard'),
+                                    ),
+                                    ElevatedButton(
+                                      onPressed: () async {
+                                        await leaderboard.cleanupDuplicateLeaderboardEntries();
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(content: Text('Duplicates cleaned')),
+                                        );
+                                      },
+                                      child: const Text('Clean Duplicates'),
+                                    ),
+                                    ElevatedButton(
+                                      onPressed: () async {
+                                        await leaderboard.cleanupDuplicateBlogReads();
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(content: Text('Blog duplicates cleaned')),
+                                        );
+                                      },
+                                      child: const Text('Clean Blog Duplicates'),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 16),
+                                const Text(
+                                  'Quiz Progression Tools',
+                                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                                ),
+                                const SizedBox(height: 12),
+                                Wrap(
+                                  spacing: 8,
+                                  runSpacing: 8,
+                                  children: [
+                                    ElevatedButton(
+                                      onPressed: () async {
+                                        final currentDay = await quiz_service.getUserCurrentDay();
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(content: Text('Current day: $currentDay')),
+                                        );
+                                      },
+                                      child: const Text('Check Current Day'),
+                                    ),
+                                    ElevatedButton(
+                                      onPressed: () async {
+                                        await quiz_service.updateUserCurrentDay(1);
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(content: Text('Reset to Day 1')),
+                                        );
+                                      },
+                                      child: const Text('Reset to Day 1'),
+                                    ),
+                                    ElevatedButton(
+                                      onPressed: () async {
+                                        final progression = await quiz_service.getUserQuizProgression();
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(content: Text('Found ${progression.length} quizzes')),
+                                        );
+                                      },
+                                      child: const Text('Check Progression'),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
                       ],
                     ),

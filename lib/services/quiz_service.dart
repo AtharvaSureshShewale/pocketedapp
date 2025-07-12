@@ -56,7 +56,170 @@ Database Schema for Quiz Feature:
    - last_quiz_date (timestamp with timezone, nullable)
    - created_at (timestamp with timezone, default: now())
    - updated_at (timestamp with timezone, default: now())
+
+6. user_quiz_progress Table (NEW):
+   - id (primary key, auto-increment)
+   - user_id (foreign key references auth.users.id)
+   - current_day (integer, default: 1)
+   - total_days_completed (integer, default: 0)
+   - created_at (timestamp with timezone, default: now())
+   - updated_at (timestamp with timezone, default: now())
 */
+
+/// Get user's current quiz day
+Future<int> getUserCurrentDay() async {
+  try {
+    final userId = supabase.auth.currentUser?.id;
+    if (userId == null) return 1;
+
+    final response = await supabase
+        .from('user_quiz_progress')
+        .select('current_day')
+        .eq('user_id', userId)
+        .maybeSingle();
+
+    if (response != null) {
+      return response['current_day'] ?? 1;
+    } else {
+      // Create new progress record for user
+      await supabase.from('user_quiz_progress').insert({
+        'user_id': userId,
+        'current_day': 1,
+        'total_days_completed': 0,
+      });
+      return 1;
+    }
+  } catch (e) {
+    print('Error getting user current day: $e');
+    return 1;
+  }
+}
+
+/// Update user's current day after completing a quiz
+Future<void> updateUserCurrentDay(int newDay) async {
+  try {
+    final userId = supabase.auth.currentUser?.id;
+    if (userId == null) return;
+
+    await supabase.from('user_quiz_progress').upsert({
+      'user_id': userId,
+      'current_day': newDay,
+      'total_days_completed': newDay - 1,
+      'updated_at': DateTime.now().toIso8601String(),
+    });
+  } catch (e) {
+    print('Error updating user current day: $e');
+  }
+}
+
+/// Get all available quizzes for user (completed, current, and locked)
+Future<List<Map<String, dynamic>>> getUserQuizProgression() async {
+  try {
+    final userId = supabase.auth.currentUser?.id;
+    if (userId == null) return [];
+
+    // Get user's current day
+    final currentDay = await getUserCurrentDay();
+
+    // Get all quizzes ordered by day number
+    final allQuizzes = await supabase
+        .from('quizzes')
+        .select()
+        .order('day_number', ascending: true);
+
+    // Get user's completed quizzes
+    final completedQuizzes = await supabase
+        .from('user_quiz_attempts')
+        .select('quiz_id, score')
+        .eq('user_id', userId)
+        .eq('completed', true);
+
+    final completedQuizIds = completedQuizzes.map((q) => q['quiz_id']).toSet();
+
+    // Create progression list
+    final progression = <Map<String, dynamic>>[];
+    
+    for (var quiz in allQuizzes) {
+      final dayNumber = quiz['day_number'] as int;
+      final quizId = quiz['id'] as int;
+      final isCompleted = completedQuizIds.contains(quizId);
+      final isCurrentDay = dayNumber == currentDay;
+      final isLocked = dayNumber > currentDay;
+      final isAvailable = dayNumber <= currentDay;
+
+      // Get score for completed quiz
+      int score = 0;
+      if (isCompleted) {
+        final completedQuiz = completedQuizzes.firstWhere(
+          (q) => q['quiz_id'] == quizId,
+          orElse: () => {'score': 0},
+        );
+        score = completedQuiz['score'] ?? 0;
+      }
+
+      progression.add({
+        'quiz': quiz,
+        'dayNumber': dayNumber,
+        'isCompleted': isCompleted,
+        'isCurrentDay': isCurrentDay,
+        'isLocked': isLocked,
+        'isAvailable': isAvailable,
+        'score': score,
+      });
+    }
+
+    return progression;
+  } catch (e) {
+    print('Error getting user quiz progression: $e');
+    return [];
+  }
+}
+
+/// Check if user can advance to next day
+Future<bool> canAdvanceToNextDay() async {
+  try {
+    final userId = supabase.auth.currentUser?.id;
+    if (userId == null) return false;
+
+    final currentDay = await getUserCurrentDay();
+
+    // Check if user has completed the current day's quiz
+    final currentDayQuiz = await supabase
+        .from('quizzes')
+        .select('id')
+        .eq('day_number', currentDay)
+        .maybeSingle();
+
+    if (currentDayQuiz == null) return false;
+
+    final completedAttempt = await supabase
+        .from('user_quiz_attempts')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('quiz_id', currentDayQuiz['id'])
+        .eq('completed', true)
+        .maybeSingle();
+
+    return completedAttempt != null;
+  } catch (e) {
+    print('Error checking if user can advance: $e');
+    return false;
+  }
+}
+
+/// Advance user to next day (called after completing current day's quiz)
+Future<void> advanceToNextDay() async {
+  try {
+    final currentDay = await getUserCurrentDay();
+    final canAdvance = await canAdvanceToNextDay();
+
+    if (canAdvance) {
+      await updateUserCurrentDay(currentDay + 1);
+    }
+  } catch (e) {
+    print('Error advancing to next day: $e');
+  }
+}
 
 /// Fetch active daily quiz
 Future<Quiz?> fetchDailyQuiz() async {
@@ -76,6 +239,27 @@ Future<Quiz?> fetchDailyQuiz() async {
     return Quiz.fromJson(response.first);
   } catch (e) {
     print('Error fetching daily quiz: $e');
+    return null;
+  }
+}
+
+/// Fetch quiz for specific day
+Future<Quiz?> fetchQuizForDay(int dayNumber) async {
+  try {
+    final response = await supabase
+        .from('quizzes')
+        .select()
+        .eq('day_number', dayNumber)
+        .eq('is_active', true)
+        .maybeSingle();
+    
+    if (response == null) {
+      return null;
+    }
+    
+    return Quiz.fromJson(response);
+  } catch (e) {
+    print('Error fetching quiz for day $dayNumber: $e');
     return null;
   }
 }
@@ -164,6 +348,9 @@ Future<void> completeQuizAttempt(int attemptId, int totalScore) async {
       'last_quiz_date': DateTime.now().toIso8601String(),
     });
   }
+  
+  // Advance user to next day if they completed their current day's quiz
+  await advanceToNextDay();
 }
 
 /// Get quiz results for an attempt
