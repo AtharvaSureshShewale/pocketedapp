@@ -61,6 +61,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
     id UUID REFERENCES auth.users(id) PRIMARY KEY,
     username TEXT,
     avatar_url TEXT,
+    points INTEGER DEFAULT 0,
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -79,6 +80,20 @@ DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE PROCEDURE public.handle_new_user();
+
+-- Create function to increment user points
+CREATE OR REPLACE FUNCTION public.increment_user_points(p_user_id UUID, p_points INTEGER)
+RETURNS VOID AS $$
+BEGIN
+  UPDATE public.profiles 
+  SET points = COALESCE(points, 0) + p_points,
+      updated_at = NOW()
+  WHERE id = p_user_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Grant execute permission on the function
+GRANT EXECUTE ON FUNCTION public.increment_user_points(UUID, INTEGER) TO authenticated;
 
 -- Set up Row Level Security (RLS) policies
 
@@ -149,4 +164,8 @@ CREATE POLICY "Anyone can read profiles" ON public.profiles
   FOR SELECT USING (true);
   
 CREATE POLICY "Users can update their own profile" ON public.profiles
-  FOR UPDATE USING (auth.uid() = id); 
+  FOR UPDATE USING (auth.uid() = id);
+
+-- Allow users to insert their own profile (for new users)
+CREATE POLICY "Users can insert their own profile" ON public.profiles
+  FOR INSERT WITH CHECK (auth.uid() = id); 

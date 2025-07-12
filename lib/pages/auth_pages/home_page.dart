@@ -5,8 +5,10 @@ import 'package:pocketed/pages/blogs/blogs_section.dart';
 import 'package:pocketed/pages/courses/available_courses_list.dart';
 import 'package:pocketed/pages/courses/enrolled_courses_list.dart';
 import 'package:pocketed/services/course_service.dart';
+import 'package:pocketed/services/leaderboard_service.dart' as leaderboard;
 import 'package:pocketed/services/supabase_service.dart';
 import 'package:pocketed/widgets/shared_scaffold.dart';
+import 'package:pocketed/widgets/leaderboard_card.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class HomePage extends StatefulWidget {
@@ -30,6 +32,14 @@ class _HomePageState extends State<HomePage> {
 
   List<Map<String, dynamic>> blogs = [];
   bool isLoading = true;
+  
+  // Leaderboard data
+  List<leaderboard.MainLeaderboardEntry> _topLeaderboard = [];
+  leaderboard.MainLeaderboardEntry? _currentUserEntry;
+  int? _currentUserPosition;
+  
+  // Key for BlogSection to refresh read status
+  final GlobalKey _blogSectionKey = GlobalKey();
 
   Future<void> fetchBlogs() async {
     setState(() => isLoading = true);
@@ -53,6 +63,7 @@ class _HomePageState extends State<HomePage> {
   int _points = 0;
 
   StreamSubscription<List<Map<String, dynamic>>>? _pointsSubscription;
+  StreamSubscription<List<Map<String, dynamic>>>? _leaderboardSubscription;
 
   @override
   void initState() {
@@ -60,11 +71,14 @@ class _HomePageState extends State<HomePage> {
     loadAllData();
     fetchBlogs();
     _listenToPoints();
+    _listenToLeaderboard();
+    _cleanupDuplicatesOnStart();
   }
 
   @override
   void dispose() {
     _pointsSubscription?.cancel();
+    _leaderboardSubscription?.cancel();
     super.dispose();
   }
 
@@ -94,6 +108,17 @@ class _HomePageState extends State<HomePage> {
           .eq('id', userId)
           .maybeSingle();
 
+      // Load leaderboard data
+      print('🏠 Home page: Loading leaderboard data...');
+      final leaderboardData = await leaderboard.fetchMainLeaderboard();
+      print('🏠 Home page: Got ${leaderboardData.length} leaderboard entries');
+      
+      final currentUserEntry = await leaderboard.getCurrentUserEntry();
+      final currentUserPosition = await leaderboard.getCurrentUserPosition();
+      
+      print('🏠 Home page: Current user entry: $currentUserEntry');
+      print('🏠 Home page: Current user position: $currentUserPosition');
+
       if (!mounted) return;
 
       setState(() {
@@ -103,8 +128,13 @@ class _HomePageState extends State<HomePage> {
         _enrolledCourses = enrolled;
         _blogs = blogs;
         _points = profile?['points'] ?? 0;
+        _topLeaderboard = leaderboardData.take(5).toList(); // Top 5 only
+        _currentUserEntry = currentUserEntry;
+        _currentUserPosition = currentUserPosition;
         _isLoading = false;
       });
+      
+      print('🏠 Home page: Set top leaderboard with ${_topLeaderboard.length} entries');
     } catch (e) {
       if (!mounted) return;
       setState(() => _isLoading = false);
@@ -128,6 +158,24 @@ class _HomePageState extends State<HomePage> {
             });
           }
         });
+  }
+
+  void _listenToLeaderboard() {
+    print('🎧 Setting up leaderboard listener...');
+    
+    // Listen to changes in profiles table
+    _leaderboardSubscription = Supabase.instance.client
+        .from('profiles')
+        .stream(primaryKey: ['id'])
+        .listen((event) {
+          print('🎧 Leaderboard data changed, refreshing...');
+          loadAllData(); // Reload all data when leaderboard changes
+        });
+  }
+
+  void _cleanupDuplicatesOnStart() async {
+    // Clean up duplicates when the app starts
+    await leaderboard.cleanupDuplicateLeaderboardEntries();
   }
 
   void logout() async {
@@ -193,6 +241,30 @@ class _HomePageState extends State<HomePage> {
 
                         const SizedBox(height: 24),
 
+                        // 🏆 Leaderboard Section
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(
+                              '🏆 Top Leaderboard',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            TextButton(
+                              onPressed: () {
+                                Navigator.pushNamed(context, '/leaderboard');
+                              },
+                              child: const Text('View All'),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        _buildLeaderboardPreview(),
+
+                        const SizedBox(height: 24),
+
                         // 📚 Courses
                         if (_enrolledCourses.isNotEmpty) ...[
                           const Text(
@@ -230,28 +302,86 @@ class _HomePageState extends State<HomePage> {
                         ),
                         const SizedBox(height: 12),
                         BlogSection(
+                          key: _blogSectionKey,
                           blogPosts: blogs,
                           isHorizontal: true,
                           onCardTap: (blog) async {
-                            Navigator.pushNamed(
+                            await Navigator.pushNamed(
                               context,
                               '/blogDetails',
                               arguments: blog,
                             );
-                            setState(() {
-                              final index = blogs.indexWhere(
-                                (b) => b['id'] == blog['id'],
-                              );
-                              if (index != -1) blogs[index]['isRead'] = true;
-                            });
+                            // Refresh blog read status when returning from blog detail
+                            if (_blogSectionKey.currentState != null) {
+                              (_blogSectionKey.currentState as dynamic).refreshReadStatus();
+                            }
                           },
                         ),
                       ],
                     ),
                   ),
                 ],
-              ),
+                      ),
+      ),
+    );
+  }
+
+  Widget _buildLeaderboardPreview() {
+    print('🏆 Building leaderboard preview with ${_topLeaderboard.length} entries');
+    
+    if (_topLeaderboard.isEmpty) {
+      print('🏆 No leaderboard data available');
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.grey[100],
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Column(
+          children: [
+            const Text(
+              'No leaderboard data yet',
+              style: TextStyle(color: Colors.grey),
             ),
+            const SizedBox(height: 8),
+            ElevatedButton(
+              onPressed: () async {
+                print('🔄 Manual refresh triggered');
+                await loadAllData();
+              },
+              child: const Text('Refresh'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey[300]!),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        children: _topLeaderboard.asMap().entries.map((entry) {
+          final index = entry.key;
+          final leaderboardEntry = entry.value;
+          final position = index + 1;
+          
+          return LeaderboardCard(
+            entry: leaderboardEntry,
+            position: position,
+            showDetails: false,
+          );
+        }).toList(),
+      ),
     );
   }
 }

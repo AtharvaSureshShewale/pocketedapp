@@ -13,6 +13,7 @@ import 'package:pocketed/pages/quiz/quiz_admin_page.dart';
 import 'package:pocketed/pages/quiz/quiz_question_page.dart';
 import 'package:pocketed/pages/quiz/quiz_results_page.dart';
 import 'package:pocketed/pages/quiz/scoreboard_page.dart';
+import 'package:pocketed/pages/leaderboard/main_leaderboard_page.dart';
 import 'package:pocketed/utils/constant.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:pocketed/pages/blogs/blog_display_page.dart';
@@ -63,6 +64,7 @@ class MyApp extends StatelessWidget {
         '/quiz': (context) => const DailyQuizPage(),
         '/quiz/scoreboard': (context) => const ScoreboardPage(),
         '/quiz/admin': (context) => const QuizAdminPage(),
+        '/leaderboard': (context) => const MainLeaderboardPage(),
         // 🔥 Removed '/blogDetails' from static routes
       },
       onGenerateRoute: (settings) {
